@@ -7,70 +7,24 @@ on:
   workflow_dispatch:
 
 jobs:
-  update-readme-bom:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Clona il repository
+      - name: Clona repository
         uses: actions/checkout@v4
 
-      - name: Configura Python
-        uses: actions/setup-python@v5
+      - name: Converti CSV in Tabella Markdown
+        uses: petems/csv-to-markdown-table-action@master
         with:
-          python-version: '3.x'
+          file: 'BOM.csv'
+          readme: 'README.md'
+          comment-tag: 'BOM-TABLE'
 
-      - name: Genera Tabella Markdown da BOM.csv
-        run: |
-          python -c "
-          import csv
-
-          output = []
-          output.append('| Item | Qty | Supplier | Cost/item | Total Cost | Link |')
-          output.append('| :--- | :---: | :--- | :---: | :---: | :--- |')
-
-          try:
-              with open('BOM.csv', mode='r', encoding='utf-8') as f:
-                  reader = csv.reader(f)
-                  next(reader, None) # Salta l'intestazione
-                  for row in reader:
-                      if not row or not row[0].strip() or len(row) < 6:
-                          continue
-                      item = row[0].strip()
-                      qty = row[1].strip()
-                      supplier = row[2].strip()
-                      cost = row[3].strip()
-                      total = row[4].strip()
-                      link = row[5].strip()
-                      link_md = f'[Link]({link})' if link.startswith('http') else ''
-                      output.append(f'| {item} | {qty} | {supplier} | {cost} | {total} | {link_md} |')
-          except Exception as e:
-              print(f'Errore: {e}')
-
-          bom_table = '\n'.join(output)
-
-          with open('README.md', 'r', encoding='utf-8') as f:
-              readme = f.read()
-
-          start_tag = '<!--START_SECTION:BOM-TABLE-->'
-          end_tag = '<!--END_SECTION:BOM-TABLE-->'
-
-          if start_tag in readme and end_tag in readme:
-              before = readme.split(start_tag)[0]
-              after = readme.split(end_tag)[1]
-              new_readme = f'{before}{start_tag}\n{bom_table}\n{end_tag}{after}'
-              with open('README.md', 'w', encoding='utf-8') as f:
-                  f.write(new_readme)
-          "
-
-      - name: Sincronizza con il repository remoto
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull origin main --rebase || echo "No rebase needed"
-
-      - name: Committa e invia le modifiche
+      - name: Committa le modifiche
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "docs: aggiorna automaticamente la tabella BOM nel README"
+          branch: ${{ github.head_ref || github.ref_name }}
